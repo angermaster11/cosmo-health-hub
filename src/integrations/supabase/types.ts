@@ -14,7 +14,143 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      appointments: {
+        Row: {
+          appointment_date: string
+          appointment_time: string
+          created_at: string
+          disease_or_vaccination: string | null
+          doctor_id: string
+          id: string
+          notes: string | null
+          patient_age: number
+          patient_id: string
+          patient_name: string
+          patient_weight: number | null
+          status: string | null
+          symptoms: string | null
+          updated_at: string
+        }
+        Insert: {
+          appointment_date: string
+          appointment_time: string
+          created_at?: string
+          disease_or_vaccination?: string | null
+          doctor_id: string
+          id?: string
+          notes?: string | null
+          patient_age: number
+          patient_id: string
+          patient_name: string
+          patient_weight?: number | null
+          status?: string | null
+          symptoms?: string | null
+          updated_at?: string
+        }
+        Update: {
+          appointment_date?: string
+          appointment_time?: string
+          created_at?: string
+          disease_or_vaccination?: string | null
+          doctor_id?: string
+          id?: string
+          notes?: string | null
+          patient_age?: number
+          patient_id?: string
+          patient_name?: string
+          patient_weight?: number | null
+          status?: string | null
+          symptoms?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "appointments_doctor_id_fkey"
+            columns: ["doctor_id"]
+            isOneToOne: false
+            referencedRelation: "doctors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      doctors: {
+        Row: {
+          available_days: string[] | null
+          available_hours: string | null
+          consultation_fee: number | null
+          created_at: string
+          email: string
+          experience_years: number | null
+          id: string
+          name: string
+          phone: string
+          qualification: string | null
+          specialization: string
+          updated_at: string
+        }
+        Insert: {
+          available_days?: string[] | null
+          available_hours?: string | null
+          consultation_fee?: number | null
+          created_at?: string
+          email: string
+          experience_years?: number | null
+          id?: string
+          name: string
+          phone: string
+          qualification?: string | null
+          specialization: string
+          updated_at?: string
+        }
+        Update: {
+          available_days?: string[] | null
+          available_hours?: string | null
+          consultation_fee?: number | null
+          created_at?: string
+          email?: string
+          experience_years?: number | null
+          id?: string
+          name?: string
+          phone?: string
+          qualification?: string | null
+          specialization?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string | null
+          full_name: string | null
+          id: string
+          phone: string | null
+          role: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          phone?: string | null
+          role?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          phone?: string | null
+          role?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
