@@ -51,6 +51,7 @@ export default function Dashboard() {
       if (doctorsError) throw doctorsError;
 
       setAppointments(appointmentsData || []);
+      console.log(appointments)
       setDoctors(doctorsData || []);
       setStats({
         appointments: appointmentsData?.length || 0,
@@ -175,8 +176,8 @@ export default function Dashboard() {
                   {stats.recentAppointments.map((appointment: any) => (
                     <div key={appointment.id} className="flex items-center justify-between p-3 border border-border rounded-lg">
                       <div>
-                        <p className="font-medium">{appointment.doctors?.name}</p>
-                        <p className="text-sm text-muted-foreground">{appointment.doctors?.specialization}</p>
+                        <p className="font-medium">{appointment.patient_name}</p>
+                        <p className="text-sm text-muted-foreground">{appointment.doctors?.name} | {appointment.doctors?.specialization}</p>
                         <p className="text-sm text-muted-foreground">
                           {new Date(appointment.appointment_date).toLocaleDateString()} at {appointment.appointment_time}
                         </p>
