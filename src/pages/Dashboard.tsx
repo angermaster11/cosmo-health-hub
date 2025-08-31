@@ -84,7 +84,6 @@ export default function Dashboard() {
               Sign Out
             </Button>
             <Button variant="outline" onClick={()=>{
-              navigate('/video-call');
             }} className="gap-2">
               <LogOut className="h-4 w-4" />
               Video Call
@@ -177,4 +176,5 @@ export default function Dashboard() {
     </div>
   );
 }
+
 
