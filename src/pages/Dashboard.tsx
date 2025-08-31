@@ -25,7 +25,7 @@ export default function Dashboard() {
 
   const loadDashboardData = async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/db_info");
+      const res = await fetch("https://327e33ee9be8.ngrok-free.app/api/db_info");
       if (!res.ok) throw new Error("Failed to fetch db_info");
       const data = await res.json();
 
@@ -177,3 +177,4 @@ export default function Dashboard() {
     </div>
   );
 }
+
