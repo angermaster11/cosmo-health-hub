@@ -3,10 +3,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Heart, Stethoscope, Calendar, Users, Shield, Clock } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
 const Index = () => {
   const { user, loading } = useAuth();
-
+  const navigate = useNavigate();
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -28,12 +29,12 @@ const Index = () => {
             <p className="text-xl text-muted-foreground mb-6">
               You're already logged in! Access your dashboard to manage appointments and view doctors.
             </p>
-            <Link to="/dashboard">
-              <Button size="lg" className="gap-2">
+
+              <Button size="lg" className="gap-2" onClick={() => navigate('/dashboard')}>
                 <Calendar className="h-5 w-5" />
                 Go to Dashboard
               </Button>
-            </Link>
+            
           </div>
         </div>
       </div>
