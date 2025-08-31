@@ -1,26 +1,19 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
 import { Navigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, Users, Stethoscope, Plus, LogOut, Heart } from 'lucide-react';
 import { toast } from 'sonner';
-import AppointmentDialog from '@/components/AppointmentDialog';
-import DoctorDialog from '@/components/DoctorDialog';
 
 export default function Dashboard() {
   const { user, loading, signOut } = useAuth();
+  const [patients, setPatients] = useState<any[]>([]);
   const [stats, setStats] = useState({
-    appointments: 0,
-    doctors: 0,
-    recentAppointments: [],
+    totalPatients: 0,
+    recentPatients: [],
   });
-  const [appointments, setAppointments] = useState([]);
-  const [doctors, setDoctors] = useState([]);
-  const [showAppointmentDialog, setShowAppointmentDialog] = useState(false);
-  const [showDoctorDialog, setShowDoctorDialog] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -30,37 +23,18 @@ export default function Dashboard() {
 
   const loadDashboardData = async () => {
     try {
-      // Load appointments
-      const { data: appointmentsData, error: appointmentsError } = await supabase
-        .from('appointments')
-        .select(`
-          *,
-          doctors (name, specialization)
-        `)
-        .eq('patient_id', user?.id)
-        .order('appointment_date', { ascending: true });
+      const res = await fetch("http://localhost:5000/api/db_info");
+      if (!res.ok) throw new Error("Failed to fetch db_info");
+      const data = await res.json();
 
-      if (appointmentsError) throw appointmentsError;
-
-      // Load all doctors
-      const { data: doctorsData, error: doctorsError } = await supabase
-        .from('doctors')
-        .select('*')
-        .order('name');
-
-      if (doctorsError) throw doctorsError;
-
-      setAppointments(appointmentsData || []);
-      console.log(appointments)
-      setDoctors(doctorsData || []);
+      setPatients(data.db_info || []);
       setStats({
-        appointments: appointmentsData?.length || 0,
-        doctors: doctorsData?.length || 0,
-        recentAppointments: appointmentsData?.slice(0, 3) || [],
+        totalPatients: data.db_info?.length || 0,
+        recentPatients: data.db_info?.slice(0, 3) || [],
       });
     } catch (error) {
-      console.error('Error loading dashboard data:', error);
-      toast.error('Failed to load dashboard data');
+      console.error("Error loading dashboard data:", error);
+      toast.error("Failed to load dashboard data");
     }
   };
 
@@ -78,10 +52,9 @@ export default function Dashboard() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'scheduled': return 'bg-primary text-primary-foreground';
-      case 'completed': return 'bg-success text-success-foreground';
-      case 'cancelled': return 'bg-destructive text-destructive-foreground';
-      case 'no-show': return 'bg-warning text-warning-foreground';
+      case 'Appointment booked': return 'bg-primary text-primary-foreground';
+      case 'Not Vaccinated': return 'bg-warning text-warning-foreground';
+      case 'Vaccinated': return 'bg-success text-success-foreground';
       default: return 'bg-muted text-muted-foreground';
     }
   };
@@ -99,7 +72,9 @@ export default function Dashboard() {
               </div>
               <div>
                 <h1 className="text-2xl font-bold">COSMO HOSPITAL</h1>
-                <p className="text-sm text-muted-foreground">Welcome back, {user.user_metadata?.full_name || user.email}</p>
+                <p className="text-sm text-muted-foreground">
+                  Welcome back, {user.user_metadata?.full_name || user.email}
+                </p>
               </div>
             </div>
             <Button variant="outline" onClick={signOut} className="gap-2">
@@ -115,76 +90,45 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">My Appointments</CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.appointments}</div>
-              <p className="text-xs text-muted-foreground">Total scheduled</p>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Available Doctors</CardTitle>
+              <CardTitle className="text-sm font-medium">Total Patients</CardTitle>
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.doctors}</div>
-              <p className="text-xs text-muted-foreground">Specialists available</p>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Quick Actions</CardTitle>
-              <Plus className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <Button 
-                size="sm" 
-                className="w-full"
-                onClick={() => setShowAppointmentDialog(true)}
-              >
-                Book Appointment
-              </Button>
-              <Button 
-                size="sm" 
-                variant="outline" 
-                className="w-full"
-                onClick={() => setShowDoctorDialog(true)}
-              >
-                Add Doctor
-              </Button>
+              <div className="text-2xl font-bold">{stats.totalPatients}</div>
+              <p className="text-xs text-muted-foreground">Registered in system</p>
             </CardContent>
           </Card>
         </div>
 
         {/* Main Content */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Recent Appointments */}
+          {/* Recent Patients */}
           <Card>
             <CardHeader>
-              <CardTitle>Recent Appointments</CardTitle>
-              <CardDescription>Your latest scheduled appointments</CardDescription>
+              <CardTitle>Recent Patients</CardTitle>
+              <CardDescription>Latest registered patients</CardDescription>
             </CardHeader>
             <CardContent>
-              {stats.recentAppointments.length === 0 ? (
-                <p className="text-muted-foreground text-center py-4">No appointments scheduled</p>
+              {stats.recentPatients.length === 0 ? (
+                <p className="text-muted-foreground text-center py-4">No patients found</p>
               ) : (
                 <div className="space-y-4">
-                  {stats.recentAppointments.map((appointment: any) => (
-                    <div key={appointment.id} className="flex items-center justify-between p-3 border border-border rounded-lg">
+                  {stats.recentPatients.map((p: any) => (
+                    <div
+                      key={p._id}
+                      className="flex items-center justify-between p-3 border border-border rounded-lg"
+                    >
                       <div>
-                        <p className="font-medium">{appointment.patient_name}</p>
-                        <p className="text-sm text-muted-foreground">{appointment.doctors?.name} | {appointment.doctors?.specialization}</p>
+                        <p className="font-medium">{p.name}</p>
+                        <p className="text-sm text-muted-foreground">{p.Doctor_name}</p>
                         <p className="text-sm text-muted-foreground">
-                          {new Date(appointment.appointment_date).toLocaleDateString()} at {appointment.appointment_time}
+                          Age: {p.age} | Weight: {p.weight}kg
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {new Date(p.date).toLocaleDateString()}
                         </p>
                       </div>
-                      <Badge className={getStatusColor(appointment.status)}>
-                        {appointment.status}
-                      </Badge>
+                      <Badge className={getStatusColor(p.status)}>{p.status}</Badge>
                     </div>
                   ))}
                 </div>
@@ -192,28 +136,28 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-          {/* Available Doctors */}
+          {/* All Patients */}
           <Card>
             <CardHeader>
-              <CardTitle>Available Doctors</CardTitle>
-              <CardDescription>Our medical specialists</CardDescription>
+              <CardTitle>All Patients</CardTitle>
+              <CardDescription>Database records</CardDescription>
             </CardHeader>
             <CardContent>
-              {doctors.length === 0 ? (
-                <p className="text-muted-foreground text-center py-4">No doctors available</p>
+              {patients.length === 0 ? (
+                <p className="text-muted-foreground text-center py-4">No patients in database</p>
               ) : (
                 <div className="space-y-4 max-h-96 overflow-y-auto">
-                  {doctors.slice(0, 5).map((doctor: any) => (
-                    <div key={doctor.id} className="flex items-center justify-between p-3 border border-border rounded-lg">
+                  {patients.map((p: any) => (
+                    <div
+                      key={p._id}
+                      className="flex items-center justify-between p-3 border border-border rounded-lg"
+                    >
                       <div>
-                        <p className="font-medium">{doctor.name}</p>
-                        <p className="text-sm text-muted-foreground">{doctor.specialization}</p>
-                        <p className="text-sm text-muted-foreground">{doctor.experience_years} years experience</p>
+                        <p className="font-medium">{p.name}</p>
+                        <p className="text-sm text-muted-foreground">{p.address}</p>
+                        <p className="text-sm text-muted-foreground">{p.Doctor_name}</p>
                       </div>
-                      <div className="text-right">
-                        <p className="font-medium">${doctor.consultation_fee}</p>
-                        <p className="text-sm text-muted-foreground">consultation</p>
-                      </div>
+                      <Badge className={getStatusColor(p.status)}>{p.status}</Badge>
                     </div>
                   ))}
                 </div>
@@ -222,20 +166,6 @@ export default function Dashboard() {
           </Card>
         </div>
       </div>
-
-      {/* Dialogs */}
-      <AppointmentDialog 
-        open={showAppointmentDialog}
-        onOpenChange={setShowAppointmentDialog}
-        doctors={doctors}
-        onSuccess={loadDashboardData}
-      />
-      
-      <DoctorDialog 
-        open={showDoctorDialog}
-        onOpenChange={setShowDoctorDialog}
-        onSuccess={loadDashboardData}
-      />
     </div>
   );
 }
