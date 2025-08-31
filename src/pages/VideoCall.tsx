@@ -165,6 +165,18 @@ export default function VideoCall() {
       }
     };
 
+    peerConnection.current.onnegotiationneeded = async () => {
+  try {
+    if (isCallCreator) return;
+    const offer = await peerConnection.current!.createOffer();
+    await peerConnection.current!.setLocalDescription(offer);
+    ws.current?.send(JSON.stringify({ type: "offer", offer, call_id: callId }));
+  } catch (err) {
+    console.error("Negotiation error:", err);
+  }
+};
+
+
     peerConnection.current.onconnectionstatechange = () => {
       console.log('Connection state:', peerConnection.current?.connectionState);
       if (peerConnection.current?.connectionState === 'connected') {
@@ -191,19 +203,27 @@ export default function VideoCall() {
       check();
     });
 
-  const getLocalMedia = async () => {
-    let stream: MediaStream | null = null;
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      setLocalStream(stream);
-    } catch (err: any) {
-      if (err.name === 'NotReadableError' || err.name === 'NotAllowedError') {
-        toast.warning('Camera/microphone not available. Joining without local media.');
-        setLocalStream(null);
-      } else throw err;
+const getLocalMedia = async () => {
+  let stream: MediaStream | null = null;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+    setLocalStream(stream);
+
+    // ✅ also add tracks to peerConnection if it already exists
+    if (peerConnection.current) {
+      stream.getTracks().forEach(track => {
+        peerConnection.current?.addTrack(track, stream);
+      });
     }
-    return stream;
-  };
+  } catch (err: any) {
+    if (err.name === 'NotReadableError' || err.name === 'NotAllowedError') {
+      toast.warning('Camera/microphone not available. Joining without local media.');
+      setLocalStream(null);
+    } else throw err;
+  }
+  return stream;
+};
+
 
   const createCall = async () => {
     if (!user) return toast.error('Sign in to create a call');
