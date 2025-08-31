@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, Users, Stethoscope, Plus, LogOut, Heart } from 'lucide-react';
 import { toast } from 'sonner';
-
+import { useNavigate } from 'react-router-dom';
 export default function Dashboard() {
   const { user, loading, signOut } = useAuth();
   const [patients, setPatients] = useState<any[]>([]);
@@ -14,6 +14,8 @@ export default function Dashboard() {
     totalPatients: 0,
     recentPatients: [],
   });
+
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (user) {
@@ -80,6 +82,12 @@ export default function Dashboard() {
             <Button variant="outline" onClick={signOut} className="gap-2">
               <LogOut className="h-4 w-4" />
               Sign Out
+            </Button>
+            <Button variant="outline" onClick={()=>{
+              navigate('/video-call');
+            }} className="gap-2">
+              <LogOut className="h-4 w-4" />
+              Video Call
             </Button>
           </div>
         </div>
