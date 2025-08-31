@@ -1,4 +1,5 @@
-// VideoCall.tsx — full working version
+// VideoCall.tsx (fixed)
+
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -43,22 +44,21 @@ export default function VideoCall() {
     }
   }, [localStream, remoteStream]);
 
-  // When isInCall && callId are set, setup WS -> PC -> offer (creator) or wait offer (joiner)
+  // WebSocket setup AFTER callId+isInCall
   useEffect(() => {
     const setup = async () => {
       if (isInCall && callId) {
         connectWebSocket();
         try {
           await waitForWsOpen();
-          await createPeerConnection(); // ensure PC exists and (if localStream present) tracks are added
+          await createPeerConnection();
           if (isCallCreator) {
-            // only creator initiates the initial offer
             const offer = await peerConnection.current!.createOffer();
             await peerConnection.current!.setLocalDescription(offer);
             ws.current?.send(JSON.stringify({ type: 'offer', offer, call_id: callId }));
           }
         } catch (err) {
-          console.error('Failed WS/PC setup:', err);
+          console.error('Failed WS setup:', err);
           toast.error('Failed to connect. Try again.');
         }
       }
@@ -94,21 +94,20 @@ export default function VideoCall() {
         const message = JSON.parse(event.data);
 
         if (message.type === 'offer') {
-          // Joiner receives offer -> set remote, make answer
           if (!peerConnection.current) await createPeerConnection();
-          await peerConnection.current!.setRemoteDescription(new RTCSessionDescription(message.offer));
-          const answer = await peerConnection.current!.createAnswer();
-          await peerConnection.current!.setLocalDescription(answer);
+          await peerConnection.current?.setRemoteDescription(new RTCSessionDescription(message.offer));
+          const answer = await peerConnection.current?.createAnswer();
+          await peerConnection.current?.setLocalDescription(answer);
+
           ws.current?.send(JSON.stringify({ type: 'answer', answer, call_id: callId }));
         } else if (message.type === 'answer') {
-          // Creator receives answer
           if (message.answer) {
-            await peerConnection.current!.setRemoteDescription(new RTCSessionDescription(message.answer));
+            await peerConnection.current?.setRemoteDescription(new RTCSessionDescription(message.answer));
           }
         } else if (message.type === 'ice-candidate') {
           if (message.candidate) {
             try {
-              await peerConnection.current!.addIceCandidate(new RTCIceCandidate(message.candidate));
+              await peerConnection.current?.addIceCandidate(new RTCIceCandidate(message.candidate));
             } catch (err) {
               console.warn('Failed to add ICE candidate', err);
             }
@@ -132,44 +131,30 @@ export default function VideoCall() {
     ws.current.onclose = () => console.log('WebSocket connection closed');
   };
 
-  // Create peer connection and wire up handlers. ICE servers include a public TURN for dev.
   const createPeerConnection = async () => {
     if (peerConnection.current) return;
 
-    // Add a TURN server for better connectivity (dev/demo). Replace with your TURN in prod.
     const configuration: RTCConfiguration = {
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' },
-        // public TURN (metered) for dev/demo. Replace in production with your TURN.
-        {
-          urls: 'turn:openrelay.metered.ca:80',
-          username: 'openrelayproject',
-          credential: 'openrelayproject',
-        },
-      ],
+        { urls: 'stun:stun1.l.google.com:19302' }
+      ]
     };
 
     peerConnection.current = new RTCPeerConnection(configuration);
 
-    // If local stream is already available, add its tracks to the PC
     if (localStream) {
-      try {
-        localStream.getTracks().forEach(track => {
-          peerConnection.current?.addTrack(track, localStream);
-        });
-      } catch (err) {
-        console.warn('Error adding existing local tracks to PC:', err);
-      }
+      localStream.getTracks().forEach(track => {
+        peerConnection.current?.addTrack(track, localStream);
+      });
     }
 
-    // If tracks arrive later (getLocalMedia called after PC created) we add tracks in getLocalMedia
     peerConnection.current.ontrack = (event) => {
       if (event.streams && event.streams[0]) {
         setRemoteStream(event.streams[0]);
       } else {
         const remoteMediaStream = new MediaStream();
-        if (event.track) remoteMediaStream.addTrack(event.track);
+        event.track && remoteMediaStream.addTrack(event.track);
         setRemoteStream(remoteMediaStream);
       }
     };
@@ -180,18 +165,17 @@ export default function VideoCall() {
       }
     };
 
-    // If new tracks are added to the pc after creation, negotiation is needed.
     peerConnection.current.onnegotiationneeded = async () => {
-      try {
-        // The creator already triggers the initial offer; joiner triggers negotiation when tracks added.
-        if (isCallCreator) return;
-        const offer = await peerConnection.current!.createOffer();
-        await peerConnection.current!.setLocalDescription(offer);
-        ws.current?.send(JSON.stringify({ type: 'offer', offer, call_id: callId }));
-      } catch (err) {
-        console.error('Negotiation error:', err);
-      }
-    };
+  try {
+    if (isCallCreator) return;
+    const offer = await peerConnection.current!.createOffer();
+    await peerConnection.current!.setLocalDescription(offer);
+    ws.current?.send(JSON.stringify({ type: "offer", offer, call_id: callId }));
+  } catch (err) {
+    console.error("Negotiation error:", err);
+  }
+};
+
 
     peerConnection.current.onconnectionstatechange = () => {
       console.log('Connection state:', peerConnection.current?.connectionState);
@@ -203,7 +187,7 @@ export default function VideoCall() {
 
   const waitForWsOpen = () =>
     new Promise<void>((resolve, reject) => {
-      const max = 7000;
+      const max = 5000;
       const interval = 50;
       let waited = 0;
       const check = () => {
@@ -219,39 +203,27 @@ export default function VideoCall() {
       check();
     });
 
-  // Acquire local media and attach to preview + peerConnection (if exists)
-  const getLocalMedia = async () => {
-    let stream: MediaStream | null = null;
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      setLocalStream(stream);
-      if (localVideoRef.current) localVideoRef.current.srcObject = stream;
+const getLocalMedia = async () => {
+  let stream: MediaStream | null = null;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+    setLocalStream(stream);
 
-      // If peerConnection already exists, add tracks to it now
-      if (peerConnection.current) {
-        stream.getTracks().forEach((track) => {
-          try {
-            peerConnection.current?.addTrack(track, stream);
-          } catch (err) {
-            console.warn('Error adding track to PC:', err);
-          }
-        });
-      }
-    } catch (err: any) {
-      // Device busy or permissions denied -> join without local media
-      if (err?.name === 'NotReadableError' || err?.name === 'TrackStartError') {
-        toast.warning('Camera/microphone is already in use. Joining without local media.');
-        setLocalStream(null);
-      } else if (err?.name === 'NotAllowedError') {
-        toast.error('Permission denied for camera/microphone.');
-        setLocalStream(null);
-      } else {
-        console.error('getUserMedia error:', err);
-        setLocalStream(null);
-      }
+    // ✅ also add tracks to peerConnection if it already exists
+    if (peerConnection.current) {
+      stream.getTracks().forEach(track => {
+        peerConnection.current?.addTrack(track, stream);
+      });
     }
-    return stream;
-  };
+  } catch (err: any) {
+    if (err.name === 'NotReadableError' || err.name === 'NotAllowedError') {
+      toast.warning('Camera/microphone not available. Joining without local media.');
+      setLocalStream(null);
+    } else throw err;
+  }
+  return stream;
+};
+
 
   const createCall = async () => {
     if (!user) return toast.error('Sign in to create a call');
@@ -264,13 +236,11 @@ export default function VideoCall() {
       });
       if (!res.ok) throw new Error('Failed to create call');
       const data = await res.json();
-
-      // get media first (so preview and tracks exist), then set callId/isInCall so WS and PC setup flows
       await getLocalMedia();
       setCallId(data.call_id);
       setIsInCall(true);
       setIsCallCreator(true);
-      toast.success('Call created — waiting for participant to join.');
+      toast.success('Call created, you are inside the call.');
     } catch (error: any) {
       console.error('Error creating call:', error);
       toast.error(error?.message || 'Failed to create call.');
@@ -290,14 +260,10 @@ export default function VideoCall() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id: user.id, user_name: user.user_metadata?.full_name || user.email }),
       });
-      if (!res.ok) {
-        const err = await res.json().catch(() => null);
-        throw new Error(err?.detail || 'Failed to join call');
-      }
-
+      if (!res.ok) throw new Error('Failed to join call');
       await getLocalMedia();
       setIsInCall(true);
-      toast.success('Joined call — waiting for media.');
+      toast.success('Joined call successfully');
     } catch (error: any) {
       console.error('Error joining call:', error);
       toast.error(error?.message || 'Failed to join call.');
@@ -308,16 +274,16 @@ export default function VideoCall() {
   };
 
   const leaveCall = () => {
-    if (localStream) localStream.getTracks().forEach((t) => t.stop());
+    if (localStream) localStream.getTracks().forEach(t => t.stop());
     if (peerConnection.current) {
       peerConnection.current.close();
       peerConnection.current = null;
     }
-    if (ws.current) {
+    if (ws.current && ws.current.readyState === WebSocket.OPEN) {
       try {
-        if (ws.current.readyState === WebSocket.OPEN) ws.current.send(JSON.stringify({ type: 'leave', call_id: callId }));
+        ws.current.send(JSON.stringify({ type: 'leave', call_id: callId }));
       } catch {}
-      try { ws.current.close(); } catch {}
+      ws.current.close();
       ws.current = null;
     }
     setLocalStream(null);
@@ -330,31 +296,25 @@ export default function VideoCall() {
 
   const toggleVideo = () => {
     if (localStream) {
-      localStream.getVideoTracks().forEach((t) => (t.enabled = !t.enabled));
-      setIsVideoEnabled((s) => !s);
+      localStream.getVideoTracks().forEach(t => (t.enabled = !t.enabled));
+      setIsVideoEnabled(!isVideoEnabled);
     }
   };
 
   const toggleAudio = () => {
     if (localStream) {
-      localStream.getAudioTracks().forEach((t) => (t.enabled = !t.enabled));
-      setIsAudioEnabled((s) => !s);
+      localStream.getAudioTracks().forEach(t => (t.enabled = !t.enabled));
+      setIsAudioEnabled(!isAudioEnabled);
     }
   };
 
   const copyCallId = () => {
-    if (callId) {
-      navigator.clipboard.writeText(callId);
-      toast.success('Call code copied');
-    }
+    navigator.clipboard.writeText(callId);
+    toast.success('Call code copied');
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
+    return <div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div></div>;
   }
   if (!user) return null;
 

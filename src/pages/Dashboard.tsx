@@ -9,7 +9,9 @@ import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 export default function Dashboard() {
   const { user, loading, signOut } = useAuth();
+  const [alertMessage, setAlertMessage] = useState("");
   const [patients, setPatients] = useState<any[]>([]);
+  const [emergencies, setEmergencies] = useState<any[]>([]);
   const [stats, setStats] = useState({
     totalPatients: 0,
     recentPatients: [],
@@ -20,12 +22,33 @@ export default function Dashboard() {
   useEffect(() => {
     if (user) {
       loadDashboardData();
+      loadEmergencyData();
     }
   }, [user]);
 
+const sendAlert = async () => {
+  if (!alertMessage.trim()) return;
+  try {
+    const res = await fetch("http://localhost:5000/api/video-call/send_alert", {  // underscore matches backend
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: alertMessage }),
+    });
+
+    console.log(res)
+
+    if (!res.ok) throw new Error("Failed to send alert");
+    toast.success("Alert sent successfully!");
+    setAlertMessage("");
+  } catch (error) {
+    console.error("Error sending alert:", error);
+    toast.error("Failed to send alert");
+  }
+};
+
   const loadDashboardData = async () => {
     try {
-      const res = await fetch("/api/db_info");
+      const res = await fetch("http://localhost:5000/api/db_info");
       if (!res.ok) throw new Error("Failed to fetch db_info");
       const data = await res.json();
 
@@ -34,6 +57,19 @@ export default function Dashboard() {
         totalPatients: data.db_info?.length || 0,
         recentPatients: data.db_info?.slice(0, 3) || [],
       });
+    } catch (error) {
+      console.error("Error loading dashboard data:", error);
+      toast.error("Failed to load dashboard data");
+    }
+  };
+  const loadEmergencyData = async () => {
+    try {
+      const res = await fetch("http://localhost:5000/api/emergency");
+      if (!res.ok) throw new Error("Failed to fetch emergency_info");
+      const data = await res.json();
+
+      setEmergencies(data.db_info || []);
+      
     } catch (error) {
       console.error("Error loading dashboard data:", error);
       toast.error("Failed to load dashboard data");
@@ -79,15 +115,18 @@ export default function Dashboard() {
                 </p>
               </div>
             </div>
-            <Button variant="outline" onClick={signOut} className="gap-2">
+            <div>
+              <Button variant="outline" onClick={signOut} className="">
               <LogOut className="h-4 w-4" />
               Sign Out
             </Button>
             <Button variant="outline" onClick={()=>{
-            }} className="gap-2">
+              navigate('/video-call');
+            }} className="">
               <LogOut className="h-4 w-4" />
               Video Call
             </Button>
+            </div>
           </div>
         </div>
       </header>
@@ -171,12 +210,63 @@ export default function Dashboard() {
               )}
             </CardContent>
           </Card>
+          {/* test */}
+              <Card>
+            <CardHeader>
+              <CardTitle>Emergency Alert</CardTitle>
+              <CardDescription>Database records</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {emergencies.length === 0 ? (
+                <p className="text-muted-foreground text-center py-4">No Emergency in database</p>
+              ) : (
+                <div className="space-y-4 max-h-96 overflow-y-auto">
+                  {emergencies.map((p: any) => (
+                    <div
+                      key={p._id}
+                      className="flex items-center justify-between p-3 border border-border rounded-lg"
+                    >
+                      <div>
+                        <p className="font-medium">{p.type}</p>
+                        <p className="text-sm text-muted-foreground">{p.address}</p>
+                        {/* <p className="text-sm text-muted-foreground">{p.status}</p> */}
+                      </div>
+                      <Badge className={getStatusColor(p.status)}>{p.status}</Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
+              {/* Send Alert Section */}
+<Card className="mt-8">
+  <CardHeader>
+    <CardTitle>Send Alert</CardTitle>
+    <CardDescription>Broadcast an important message to patients</CardDescription>
+  </CardHeader>
+  <CardContent>
+    <div className="flex gap-2">
+      <input
+        type="text"
+        placeholder="Type your alert message..."
+        className="flex-1 border border-border rounded-lg px-3 py-2 focus:outline-none focus:ring focus:ring-primary"
+        value={alertMessage}
+        onChange={(e) => setAlertMessage(e.target.value)}
+      />
+      <Button
+        onClick={sendAlert}
+        disabled={!alertMessage.trim()}
+        className="gap-2"
+      >
+        <Plus className="h-4 w-4" /> Send
+      </Button>
+    </div>
+  </CardContent>
+</Card>
       </div>
+
+
     </div>
   );
 }
-
-
-
-
